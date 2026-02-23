@@ -53,7 +53,7 @@
 ### Installation
 
 ```bash
-git clone https://github.com/<your-username>/NmapAutomator.git
+git clone https://github.com/at0m-b0mb/NmapAutomator.git
 cd NmapAutomator
 chmod +x nmap_automator.py
 ```
