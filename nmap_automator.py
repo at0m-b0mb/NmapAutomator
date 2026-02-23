@@ -308,10 +308,10 @@ def select_profile() -> Optional[int]:
     Display the menu and return the chosen profile number,
     or None if the user chooses 0 (exit).
     """
-    max_choice = max(PROFILES)
+    max_profile_id = max(PROFILES)
     while True:
         print_menu()
-        choice = input(f"\n{Colors.YELLOW}[?]{Colors.RESET} Select a scan profile [0-{max_choice}]: ").strip()
+        choice = input(f"\n{Colors.YELLOW}[?]{Colors.RESET} Select a scan profile [0-{max_profile_id}]: ").strip()
         if choice == "0":
             return None
         if choice.isdigit() and int(choice) in PROFILES:
@@ -416,7 +416,7 @@ def print_scan_summary(gnmap_path: Path) -> None:
     if not gnmap_path.exists():
         return
 
-    rows: List[Tuple[str, str, str]] = []
+    rows: List[Tuple[str, str, str]] = []  # (port, protocol, service)
     with gnmap_path.open() as fh:
         for line in fh:
             if "/open/" not in line:
@@ -551,7 +551,7 @@ def main() -> None:
         try:
             # Allow -s/--scan to bypass the menu once
             if args.scan is not None and args.scan in PROFILES:
-                profile_id: Optional[int] = args.scan
+                profile_id = args.scan
                 args.scan = None  # consume; subsequent iterations use the menu
             else:
                 profile_id = select_profile()
