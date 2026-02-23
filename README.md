@@ -10,13 +10,16 @@
 
 ## ✨ Features
 
-- **8 scan profiles** covering real-world pentest workflows (Quick, Full TCP, UDP, Aggressive, Targeted, Vuln, OSCP-style two-phase, Custom)
+- **11 scan profiles** covering real-world pentest workflows (Quick, Full TCP, UDP, Aggressive, Targeted, Vuln, OSCP-style two-phase, Custom, Firewall Evasion, HTTP Enum, SMB Enum)
+- **Colour-coded output** — TTY-aware ANSI colours (cyan headers, green successes, yellow prompts, red errors); automatically disabled when piping/redirecting
+- **Post-scan open-port summary** — after every scan a formatted table of discovered ports, protocols, and service names is printed
 - **Interactive CLI** with numbered menu, input validation, and clear status messages
+- **`-s`/`--scan` flag** — pre-select a profile by number to skip the interactive menu (great for scripting)
 - **Automatic output management** — timestamped folders with `.nmap`, `.gnmap`, and `.xml` files
 - **OSCP-style two-phase scan** — fast all-ports discovery followed by detailed service/script scan on open ports only
 - **Safe execution** — `subprocess.run` with `shell=False`, target validation against shell metacharacters
 - **Zero external dependencies** — Python 3 standard library only
-- **Easy to extend** — add a new scan profile by adding one dictionary entry
+- **Easy to extend** — add a new scan profile by adding one dictionary entry; the menu range updates automatically
 
 ---
 
@@ -32,6 +35,9 @@
 | 6 | Vulnerability Scripts (`--script vuln`) | `-T3 -Pn -sS -sV --script vuln` |
 | 7 | All-Ports + Detailed Follow-up (OSCP two-phase) | Phase 1: `-T4 -Pn -p-` → Phase 2: `-T3 -Pn -sS -sV -sC -p <open>` |
 | 8 | Custom (enter your own flags) | User-supplied |
+| 9 | Firewall / IDS Evasion | `-T2 -Pn -sS -f --data-length 25 -D RND:5` |
+| 10 | HTTP Enumeration (web NSE scripts) | `-T3 -Pn -sV -p 80,443,8080,8443 --script http-enum,...` |
+| 11 | SMB Enumeration (Windows / Samba) | `-T3 -Pn -sV -p 139,445 --script smb-enum-shares,...` |
 
 ---
 
@@ -60,6 +66,9 @@ sudo python3 nmap_automator.py
 
 # Pre-set a target (still choose scan profile interactively)
 sudo python3 nmap_automator.py -t 10.10.10.10
+
+# Pre-set both target and scan profile (non-interactive, great for scripting)
+sudo python3 nmap_automator.py -t 10.10.10.10 -s 1
 
 # Target with CIDR notation
 sudo python3 nmap_automator.py -t 192.168.1.0/24
@@ -92,10 +101,11 @@ nmap_results/
 
 ## 🛠️ Adding a Custom Profile
 
-Adding a new scan type requires **one dictionary entry** and zero other code changes:
+Adding a new scan type requires **one dictionary entry** and zero other code changes.
+The interactive menu range updates automatically:
 
 ```python
-PROFILES[9] = {
+PROFILES[12] = {
     "label": "Stealth Scan (slow + decoys)",
     "description": "Very slow SYN scan with decoy source addresses.",
     "flags": ["-T1", "-Pn", "-sS", "-D", "RND:5"],
@@ -104,8 +114,6 @@ PROFILES[9] = {
     "two_phase": False,
 }
 ```
-
-Then update the menu prompt range in `select_profile()` from `[0-8]` to `[0-9]`.
 
 ---
 

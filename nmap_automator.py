@@ -27,27 +27,45 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 # ─────────────────────────────────────────────────────────────────────
+# Terminal colours (ANSI – auto-disabled when stdout is not a TTY)
+# ─────────────────────────────────────────────────────────────────────
+
+
+class Colors:
+    """ANSI escape codes.  Automatically disabled when stdout is not a TTY."""
+
+    _on: bool = sys.stdout.isatty()
+    RED    = "\033[91m" if _on else ""
+    GREEN  = "\033[92m" if _on else ""
+    YELLOW = "\033[93m" if _on else ""
+    CYAN   = "\033[96m" if _on else ""
+    BOLD   = "\033[1m"  if _on else ""
+    RESET  = "\033[0m"  if _on else ""
+
+
+# ─────────────────────────────────────────────────────────────────────
 # Constants
-# ────────────────────────��────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────
 
 TOOL_NAME = "NmapAutomator"
-VERSION = "1.0.0"
+VERSION = "2.0.0"
 RESULTS_BASE = Path("nmap_results")
 SCAN_BASE_NAME = "scan"  # -oA base name inside each run folder
 
-BANNER = rf"""
-{'-' * 62}
-  _   _                          _         _
- | \ | |_ __ ___   __ _ _ __   / \  _   _| |_ ___
- |  \| | '_ ` _ \ / _` | '_ \ / _ \| | | | __/ _ \
- | |\  | | | | | | (_| | |_) / ___ \ |_| | || (_) |
- |_| \_|_| |_| |_|\__,_| .__/_/   \_\__,_|\__\___/
-                        |_|
-  {TOOL_NAME} v{VERSION}
-  Automated Nmap scanning for penetration testers
-  Run with sudo for SYN / UDP scans
-{'-' * 62}
-"""
+_BANNER_LINES = [
+    f"{Colors.CYAN}{'-' * 62}{Colors.RESET}",
+    f"{Colors.BOLD}  _   _                          _         _",
+    " | \\ | |_ __ ___   __ _ _ __   / \\  _   _| |_ ___",
+    " |  \\| | '_ ` _ \\ / _` | '_ \\ / _ \\| | | | __/ _ \\",
+    " | |\\  | | | | | | (_| | |_) / ___ \\ |_| | || (_) |",
+    " |_| \\_|_| |_| |_|\\__,_| .__/_/   \\_\\__,_|\\__\\___/",
+    f"                        |_|{Colors.RESET}",
+    f"  {Colors.YELLOW}{TOOL_NAME} v{VERSION}{Colors.RESET}",
+    "  Automated Nmap scanning for penetration testers",
+    f"  Run with {Colors.BOLD}sudo{Colors.RESET} for SYN / UDP scans",
+    f"{Colors.CYAN}{'-' * 62}{Colors.RESET}",
+]
+BANNER = "\n".join([""] + _BANNER_LINES + [""])
 
 # ─────────────────────────────────────────────────────────────────────
 # Scan profile definitions
@@ -151,6 +169,48 @@ PROFILES: Dict[int, dict] = {
         "needs_custom_flags": True,
         "two_phase": False,
     },
+    9: {
+        "label": "Firewall / IDS Evasion Scan",
+        "description": (
+            "Slow SYN scan with fragmented packets (-f), random 25-byte data "
+            "padding (--data-length 25), and 5 random decoys (-D RND:5) to "
+            "help bypass simple packet-inspection rules."
+        ),
+        "flags": ["-T2", "-Pn", "-sS", "-f", "--data-length", "25", "-D", "RND:5"],
+        "needs_ports": False,
+        "needs_custom_flags": False,
+        "two_phase": False,
+    },
+    10: {
+        "label": "HTTP Enumeration (web-focused NSE scripts)",
+        "description": (
+            "Targets common web ports (80, 443, 8080, 8443) with HTTP-specific "
+            "NSE scripts: http-enum, http-title, http-headers, http-methods."
+        ),
+        "flags": [
+            "-T3", "-Pn", "-sV",
+            "-p", "80,443,8080,8443",
+            "--script", "http-enum,http-title,http-headers,http-methods",
+        ],
+        "needs_ports": False,
+        "needs_custom_flags": False,
+        "two_phase": False,
+    },
+    11: {
+        "label": "SMB Enumeration (Windows / Samba)",
+        "description": (
+            "Targets SMB ports (139, 445) with NSE scripts for share/user "
+            "enumeration and the EternalBlue (MS17-010) vulnerability check."
+        ),
+        "flags": [
+            "-T3", "-Pn", "-sV",
+            "-p", "139,445",
+            "--script", "smb-enum-shares,smb-enum-users,smb-vuln-ms17-010,smb2-security-mode",
+        ],
+        "needs_ports": False,
+        "needs_custom_flags": False,
+        "two_phase": False,
+    },
 }
 
 # ─────────────────────────────────────────────────────────────────────
@@ -161,7 +221,7 @@ PROFILES: Dict[int, dict] = {
 def check_nmap_installed() -> None:
     """Exit immediately if nmap is not on the PATH."""
     if shutil.which("nmap") is None:
-        print("\n[!] Error: nmap is not installed or not in PATH.")
+        print(f"\n{Colors.RED}[!] Error: nmap is not installed or not in PATH.{Colors.RESET}")
         print("    Install it with:  sudo apt install nmap")
         sys.exit(1)
 
@@ -170,8 +230,8 @@ def check_root_warning() -> None:
     """Warn (don't exit) if not running as root – SYN/UDP need root."""
     if os.geteuid() != 0:
         print(
-            "\n[!] Warning: you are NOT running as root. "
-            "SYN (-sS) and UDP (-sU) scans require root privileges.\n"
+            f"\n{Colors.YELLOW}[!] Warning: you are NOT running as root. "
+            f"SYN (-sS) and UDP (-sU) scans require root privileges.{Colors.RESET}\n"
             "    Consider re-running with: sudo python3 nmap_automator.py\n"
         )
 
@@ -234,13 +294,13 @@ def prompt_non_empty(prompt_text: str, validator=None, error_msg: str = "") -> s
 
 def print_menu() -> None:
     """Render the numbered scan-profile menu."""
-    print("\n" + "=" * 50)
-    print("  SCAN PROFILES")
-    print("=" * 50)
+    print("\n" + Colors.CYAN + "=" * 50 + Colors.RESET)
+    print(f"  {Colors.BOLD}SCAN PROFILES{Colors.RESET}")
+    print(Colors.CYAN + "=" * 50 + Colors.RESET)
     for num, profile in PROFILES.items():
-        print(f"  {num}) {profile['label']}")
-    print(f"  0) Exit")
-    print("=" * 50)
+        print(f"  {Colors.YELLOW}{num}{Colors.RESET}) {profile['label']}")
+    print(f"  {Colors.YELLOW}0{Colors.RESET}) Exit")
+    print(Colors.CYAN + "=" * 50 + Colors.RESET)
 
 
 def select_profile() -> Optional[int]:
@@ -248,14 +308,15 @@ def select_profile() -> Optional[int]:
     Display the menu and return the chosen profile number,
     or None if the user chooses 0 (exit).
     """
+    max_choice = max(PROFILES)
     while True:
         print_menu()
-        choice = input("\n[?] Select a scan profile [0-8]: ").strip()
+        choice = input(f"\n{Colors.YELLOW}[?]{Colors.RESET} Select a scan profile [0-{max_choice}]: ").strip()
         if choice == "0":
             return None
         if choice.isdigit() and int(choice) in PROFILES:
             return int(choice)
-        print("[!] Invalid choice. Please enter a number from the menu.")
+        print(f"{Colors.RED}[!] Invalid choice. Please enter a number from the menu.{Colors.RESET}")
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -308,10 +369,10 @@ def run_scan(cmd: List[str]) -> int:
     Execute an Nmap command, stream stdout/stderr to the terminal,
     and return the exit code.
     """
-    print(f"\n[*] Running: {' '.join(cmd)}\n")
-    print("-" * 60)
+    print(f"\n{Colors.CYAN}[*] Running: {' '.join(cmd)}{Colors.RESET}\n")
+    print(Colors.CYAN + "-" * 60 + Colors.RESET)
     result = subprocess.run(cmd)  # inherits stdin/stdout/stderr
-    print("-" * 60)
+    print(Colors.CYAN + "-" * 60 + Colors.RESET)
     return result.returncode
 
 
@@ -347,6 +408,38 @@ def parse_open_ports_from_gnmap(gnmap_path: Path) -> List[str]:
     return sorted(ports, key=int)
 
 
+def print_scan_summary(gnmap_path: Path) -> None:
+    """
+    Parse a .gnmap file and print a colour-coded table of open ports,
+    protocols, and detected service names.
+    """
+    if not gnmap_path.exists():
+        return
+
+    rows: List[Tuple[str, str, str]] = []
+    with gnmap_path.open() as fh:
+        for line in fh:
+            if "/open/" not in line:
+                continue
+            match = re.search(r"Ports:\s+(.+)", line)
+            if not match:
+                continue
+            for entry in match.group(1).split(","):
+                parts = entry.strip().split("/")
+                # .gnmap format: port/state/proto//service//
+                if len(parts) >= 5 and parts[1] == "open":
+                    rows.append((parts[0].strip(), parts[2].strip(), parts[4].strip() or "unknown"))
+
+    if not rows:
+        return
+
+    print(f"\n{Colors.BOLD}[+] Open ports summary:{Colors.RESET}")
+    print(f"  {'PORT':<10}{'PROTO':<8}SERVICE")
+    print(f"  {'─' * 36}")
+    for port, proto, service in rows:
+        print(f"  {Colors.GREEN}{port:<10}{Colors.RESET}{proto:<8}{service}")
+
+
 def run_two_phase_scan(target: str, profile: dict, output_dir: Path) -> None:
     """
     OSCP-style two-phase scan.
@@ -355,9 +448,9 @@ def run_two_phase_scan(target: str, profile: dict, output_dir: Path) -> None:
     Phase 2 – detailed scan (version + scripts) against only the open ports.
     """
     # ── Phase 1 ──────────────────────────────────────────────────────
-    print("\n" + "=" * 60)
-    print("  PHASE 1 — Fast all-ports discovery")
-    print("=" * 60)
+    print(f"\n{Colors.CYAN}{'=' * 60}{Colors.RESET}")
+    print(f"  {Colors.BOLD}PHASE 1{Colors.RESET} — Fast all-ports discovery")
+    print(f"{Colors.CYAN}{'=' * 60}{Colors.RESET}")
 
     phase1_dir = output_dir / "phase1_discovery"
     phase1_dir.mkdir(exist_ok=True)
@@ -365,7 +458,7 @@ def run_two_phase_scan(target: str, profile: dict, output_dir: Path) -> None:
     rc = run_scan(cmd_p1)
 
     if rc != 0:
-        print(f"\n[!] Phase 1 exited with code {rc}. Aborting phase 2.")
+        print(f"\n{Colors.RED}[!] Phase 1 exited with code {rc}. Aborting phase 2.{Colors.RESET}")
         return
 
     # Parse open ports from the .gnmap file
@@ -373,22 +466,23 @@ def run_two_phase_scan(target: str, profile: dict, output_dir: Path) -> None:
     open_ports = parse_open_ports_from_gnmap(gnmap_file)
 
     if not open_ports:
-        print("\n[!] No open TCP ports discovered in phase 1. Skipping phase 2.")
+        print(f"\n{Colors.YELLOW}[!] No open TCP ports discovered in phase 1. Skipping phase 2.{Colors.RESET}")
         return
 
     ports_csv = ",".join(open_ports)
-    print(f"\n[+] Open ports found: {ports_csv}")
+    print(f"\n{Colors.GREEN}[+] Open ports found: {ports_csv}{Colors.RESET}")
 
     # ── Phase 2 ──────────────────────────────────────────────────────
-    print("\n" + "=" * 60)
-    print("  PHASE 2 — Detailed scan on discovered ports")
-    print("=" * 60)
+    print(f"\n{Colors.CYAN}{'=' * 60}{Colors.RESET}")
+    print(f"  {Colors.BOLD}PHASE 2{Colors.RESET} — Detailed scan on discovered ports")
+    print(f"{Colors.CYAN}{'=' * 60}{Colors.RESET}")
 
     phase2_flags = ["-T3", "-Pn", "-sS", "-sV", "-sC"]
     phase2_dir = output_dir / "phase2_detailed"
     phase2_dir.mkdir(exist_ok=True)
     cmd_p2 = build_command(phase2_flags, target, phase2_dir, ports=ports_csv)
     run_scan(cmd_p2)
+    print_scan_summary(phase2_dir / f"{SCAN_BASE_NAME}.gnmap")
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -409,14 +503,14 @@ def gather_extra_input(profile: dict) -> Tuple[Optional[str], List[str]]:
 
     if profile["needs_ports"]:
         ports = prompt_non_empty(
-            "[?] Enter port list (e.g. 22,80,443-445,8080): ",
+            f"{Colors.YELLOW}[?]{Colors.RESET} Enter port list (e.g. 22,80,443-445,8080): ",
             validator=validate_ports,
             error_msg="Port list must be comma-separated numbers or ranges (e.g. 22,80,443-445).",
         )
 
     if profile["needs_custom_flags"]:
         raw = prompt_non_empty(
-            "[?] Enter your custom Nmap flags (e.g. -sS -T4 -p 22,80 --script http-enum): ",
+            f"{Colors.YELLOW}[?]{Colors.RESET} Enter your custom Nmap flags (e.g. -sS -T4 -p 22,80 --script http-enum): ",
         )
         extra_flags = raw.split()
 
@@ -437,6 +531,14 @@ def main() -> None:
         default=None,
         help="Pre-set target IP / hostname / CIDR (you will still choose a scan profile).",
     )
+    parser.add_argument(
+        "-s",
+        "--scan",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Pre-select a scan profile by number (skips the interactive menu).",
+    )
     args = parser.parse_args()
 
     # ── Preflight checks ─────────────────────────────────────────────
@@ -447,24 +549,30 @@ def main() -> None:
     # ── Interactive loop ─────────────────────────────────────────────
     while True:
         try:
-            profile_id = select_profile()
+            # Allow -s/--scan to bypass the menu once
+            if args.scan is not None and args.scan in PROFILES:
+                profile_id: Optional[int] = args.scan
+                args.scan = None  # consume; subsequent iterations use the menu
+            else:
+                profile_id = select_profile()
+
             if profile_id is None:
-                print("\n[*] Exiting. Happy hacking!\n")
+                print(f"\n{Colors.CYAN}[*] Exiting. Happy hacking!{Colors.RESET}\n")
                 break
 
             profile = PROFILES[profile_id]
 
             # Print description
-            print(f"\n[i] {profile['label']}")
+            print(f"\n{Colors.BOLD}[i] {profile['label']}{Colors.RESET}")
             print(f"    {profile['description']}\n")
 
             # Target
             if args.target and validate_target(args.target):
                 target = args.target
-                print(f"[*] Using pre-set target: {target}")
+                print(f"{Colors.CYAN}[*] Using pre-set target: {target}{Colors.RESET}")
             else:
                 target = prompt_non_empty(
-                    "[?] Enter target (IP / hostname / CIDR): ",
+                    f"{Colors.YELLOW}[?]{Colors.RESET} Enter target (IP / hostname / CIDR): ",
                     validator=validate_target,
                     error_msg="Target looks invalid or contains disallowed characters.",
                 )
@@ -483,10 +591,12 @@ def main() -> None:
                 cmd = build_command(flags, target, output_dir, ports=ports)
                 rc = run_scan(cmd)
                 if rc != 0:
-                    print(f"\n[!] Nmap exited with code {rc}.")
+                    print(f"\n{Colors.RED}[!] Nmap exited with code {rc}.{Colors.RESET}")
+                else:
+                    print_scan_summary(output_dir / f"{SCAN_BASE_NAME}.gnmap")
 
             # ── Post-scan summary ────────────────────────────────────
-            print(f"\n[+] Results saved to: {output_dir.resolve()}/")
+            print(f"\n{Colors.GREEN}[+] Results saved to: {output_dir.resolve()}/{Colors.RESET}")
             print(
                 "    Files: "
                 f"{SCAN_BASE_NAME}.nmap, "
@@ -495,16 +605,16 @@ def main() -> None:
             )
 
             # Ask to continue
-            again = input("\n[?] Run another scan? (Y/n): ").strip().lower()
+            again = input(f"\n{Colors.YELLOW}[?]{Colors.RESET} Run another scan? (Y/n): ").strip().lower()
             if again in ("n", "no"):
-                print("\n[*] Exiting. Happy hacking!\n")
+                print(f"\n{Colors.CYAN}[*] Exiting. Happy hacking!{Colors.RESET}\n")
                 break
 
         except KeyboardInterrupt:
-            print("\n\n[!] Scan interrupted by user (Ctrl+C).")
-            again = input("[?] Return to menu? (Y/n): ").strip().lower()
+            print(f"\n\n{Colors.YELLOW}[!] Scan interrupted by user (Ctrl+C).{Colors.RESET}")
+            again = input(f"{Colors.YELLOW}[?]{Colors.RESET} Return to menu? (Y/n): ").strip().lower()
             if again in ("n", "no"):
-                print("\n[*] Exiting. Happy hacking!\n")
+                print(f"\n{Colors.CYAN}[*] Exiting. Happy hacking!{Colors.RESET}\n")
                 break
 
 
