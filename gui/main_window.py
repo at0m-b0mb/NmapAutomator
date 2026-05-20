@@ -66,11 +66,11 @@ class MainWindow(QMainWindow):
         sl.addWidget(sub)
 
         nav_items = [
-            ("◉",  "Dashboard"),
+            ("◆",  "Dashboard"),
             ("⚡",  "Scanner"),
-            ("⎉",  "Results"),
+            ("◈",  "Results"),
             ("⌖",  "History"),
-            ("⚒",  "Toolkit"),
+            ("✦",  "Toolkit"),
             ("⚙",  "Settings"),
         ]
         self.nav_buttons: list[NavButton] = []
