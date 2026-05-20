@@ -1,0 +1,6 @@
+# NmapAutomator — runtime dependencies
+#
+# The CLI (nmap_automator.py) needs nothing beyond the Python standard library.
+# The GUI (nmap_gui.py) needs PyQt6.
+
+PyQt6>=6.5

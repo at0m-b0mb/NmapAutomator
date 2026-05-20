@@ -1,119 +1,117 @@
-# 🔍 NmapAutomator
+# 🔍 NmapAutomator — Red-Team Edition
 
-> Menu-driven Nmap automation tool for penetration testers — OSCP / HTB style workflows in a single Python 3 script.
+> A polished red-team Nmap front-end. Beautiful PyQt6 GUI with live scan
+> output, vulnerability intel, follow-up tooling, scan history, and
+> exportable HTML / Markdown / JSON / CSV reports. The original CLI ships
+> alongside for keyboard-only workflows.
 
-![Python](https://img.shields.io/badge/Python-3.8%2B-blue?logo=python&logoColor=white)
-![Platform](https://img.shields.io/badge/Platform-Kali%20Linux-557C94?logo=kalilinux&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.9%2B-blue?logo=python&logoColor=white)
+![Qt](https://img.shields.io/badge/UI-PyQt6-41cd52?logo=qt&logoColor=white)
+![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-557C94)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 ---
 
-## ✨ Features
+## ✨ What's new in v3.0
 
-- **11 scan profiles** covering real-world pentest workflows (Quick, Full TCP, UDP, Aggressive, Targeted, Vuln, OSCP-style two-phase, Custom, Firewall Evasion, HTTP Enum, SMB Enum)
-- **Colour-coded output** — TTY-aware ANSI colours (cyan headers, green successes, yellow prompts, red errors); automatically disabled when piping/redirecting
-- **Post-scan open-port summary** — after every scan a formatted table of discovered ports, protocols, and service names is printed
-- **Interactive CLI** with numbered menu, input validation, and clear status messages
-- **`-s`/`--scan` flag** — pre-select a profile by number to skip the interactive menu (great for scripting)
-- **Automatic output management** — timestamped folders with `.nmap`, `.gnmap`, and `.xml` files
-- **OSCP-style two-phase scan** — fast all-ports discovery followed by detailed service/script scan on open ports only
-- **Safe execution** — `subprocess.run` with `shell=False`, target validation against shell metacharacters
-- **Zero external dependencies** — Python 3 standard library only
-- **Easy to extend** — add a new scan profile by adding one dictionary entry; the menu range updates automatically
-
----
-
-## 📋 Scan Profiles
-
-| # | Profile | Key Nmap Flags |
-|---|---------|---------------|
-| 1 | Quick Scan (top 1000 ports) | `-T4 -Pn -sS --top-ports 1000` |
-| 2 | Full TCP (all 65,535 ports + version + scripts) | `-T3 -Pn -sS -p- -sV -sC` |
-| 3 | UDP Scan (top 200 UDP ports) | `-T3 -Pn -sU --top-ports 200` |
-| 4 | Aggressive (OS + scripts + version + traceroute) | `-T4 -Pn -A` |
-| 5 | Targeted Ports (user-specified port list) | `-T3 -Pn -sS -sV -sC -p <ports>` |
-| 6 | Vulnerability Scripts (`--script vuln`) | `-T3 -Pn -sS -sV --script vuln` |
-| 7 | All-Ports + Detailed Follow-up (OSCP two-phase) | Phase 1: `-T4 -Pn -p-` → Phase 2: `-T3 -Pn -sS -sV -sC -p <open>` |
-| 8 | Custom (enter your own flags) | User-supplied |
-| 9 | Firewall / IDS Evasion | `-T2 -Pn -sS -f --data-length 25 -D RND:5` |
-| 10 | HTTP Enumeration (web NSE scripts) | `-T3 -Pn -sV -p 80,443,8080,8443 --script http-enum,...` |
-| 11 | SMB Enumeration (Windows / Samba) | `-T3 -Pn -sV -p 139,445 --script smb-enum-shares,...` |
+- **Beautiful dark "red-team" GUI** built with PyQt6 — custom QSS theme,
+  neon-red/cyan accents, sidebar navigation, KPI cards
+- **24 built-in scan profiles** in 5 categories (Discovery, Service,
+  Vulnerability, Stealth, Custom) — each tagged with risk + speed badges
+- **Live streaming console** with phase indicator and best-effort progress bar
+- **Parsed Results view** — host tree, port table, NSE script output,
+  inline CVE hints, suggested follow-up tools, searchsploit query
+- **Vulnerability intel layer** — service banners are matched against a
+  known-bad pattern list (vsftpd 2.3.4, Heartbleed, ProxyShell, etc.)
+- **Follow-up tooling cheat sheet** — `gobuster`, `enum4linux-ng`,
+  `smbmap`, `nikto`, `hydra`, `testssl.sh`, `crackmapexec`, and more,
+  pre-filled with the active target/port
+- **Scan history database** (SQLite) — search, tag, star, annotate every
+  scan you've ever run
+- **Scan diff** — compare the current scan against the previous one on
+  the same target to spot newly opened / closed ports
+- **Report exporters** — standalone HTML (dark themed, shareable),
+  Markdown, JSON, CSV
+- **CLI still works** — `nmap_automator.py` is unchanged and zero-dep
 
 ---
 
 ## 🚀 Quick Start
 
-### Prerequisites
-
-- **Kali Linux** (or any Linux distro with Nmap installed)
-- **Python 3.8+**
-- **Nmap** — install with `sudo apt install nmap` if not present
-- **Root privileges** — required for SYN (`-sS`) and UDP (`-sU`) scans
-
-### Installation
-
 ```bash
 git clone https://github.com/at0m-b0mb/NmapAutomator.git
 cd NmapAutomator
-chmod +x nmap_automator.py
-```
+pip install -r requirements.txt
 
-### Usage
+# GUI (recommended)
+sudo python3 nmap_gui.py
 
-```bash
-# Fully interactive
+# Classic CLI
 sudo python3 nmap_automator.py
-
-# Pre-set a target (still choose scan profile interactively)
-sudo python3 nmap_automator.py -t 10.10.10.10
-
-# Pre-set both target and scan profile (non-interactive, great for scripting)
-sudo python3 nmap_automator.py -t 10.10.10.10 -s 1
-
-# Target with CIDR notation
-sudo python3 nmap_automator.py -t 192.168.1.0/24
 ```
+
+`sudo` is required for SYN (`-sS`) and UDP (`-sU`) scans.
+
+---
+
+## 🎨 GUI Tour
+
+| Tab        | What it does                                                                      |
+|------------|-----------------------------------------------------------------------------------|
+| Dashboard  | At-a-glance KPIs, recent activity, quick-launch profile cards                     |
+| Scanner    | Profile picker + target form + **live streaming console** + progress bar          |
+| Results    | Parsed scan view — hosts, ports, banners, CVE hints, follow-up tools, exports     |
+| History    | Searchable history; tag/star/annotate; double-click to reopen results             |
+| Toolkit    | Service-to-tool cheat sheet with copy-as-command for the active target            |
+| Settings   | Environment check (nmap installed? running as root? where's the DB?), about       |
+
+---
+
+## 📋 Scan Profiles (24)
+
+| Category       | Profiles                                                              |
+|----------------|-----------------------------------------------------------------------|
+| **Discovery**  | Quick, Full TCP, UDP Top 200, Aggressive (-A), Targeted, OSCP 2-Phase, Top 100 Quick, Ping Sweep, OS Fingerprint |
+| **Service**    | HTTP, SMB, DNS, FTP, SSH, Databases, Mail, RDP/VNC/Citrix, SNMP, LDAP |
+| **Vulnerability** | Vuln Scripts, SSL/TLS Audit                                        |
+| **Stealth**    | Firewall/IDS Evasion, Stealth Slow                                    |
+| **Custom**     | Bring-your-own flags                                                  |
+
+Add a profile by editing `core/profiles.py` — one dict entry, zero other
+changes.
+
+---
+
+## 🧠 Red-Team Intel
+
+For every open port, the Results tab shows:
+
+- **CVE hints** — matches the service banner against known-bad patterns
+  (vsftpd 2.3.4 backdoor, Heartbleed, EternalBlue, ProxyShell,
+  Drupalgeddon, Tomcat Ghostcat, …)
+- **Follow-up tools** — pre-filled commands for `gobuster`, `ffuf`,
+  `nikto`, `whatweb`, `enum4linux-ng`, `smbmap`, `crackmapexec`,
+  `hydra`, `snmpwalk`, `ldapsearch`, `testssl.sh`, `mssqlclient.py`, etc.
+- **Searchsploit query** — copy-paste ready
+
+All of this is local data — **no network calls** are made by the intel layer.
 
 ---
 
 ## 📂 Output Structure
 
-All results are saved under `nmap_results/` with a timestamped subfolder per run:
+The GUI writes to `~/.nmap_automator/` by default:
 
 ```
-nmap_results/
-├── 2026-02-23_14-30-00_quick_scan_top_1000_ports/
-│   ├── scan.nmap       # Human-readable output
-│   ├── scan.gnmap      # Greppable output
-│   └── scan.xml        # XML output (for tools like searchsploit, Metasploit)
-└── 2026-02-23_14-35-12_all_ports_detailed_follow_up_.../
-    ├── phase1_discovery/
-    │   ├── scan.nmap
-    │   ├── scan.gnmap
-    │   └── scan.xml
-    └── phase2_detailed/
-        ├── scan.nmap
-        ├── scan.gnmap
-        └── scan.xml
+~/.nmap_automator/
+├── history.db                                  # SQLite history + custom profiles
+└── results/
+    └── 2026-05-19_14-30-00_quick_scan/
+        ├── scan.nmap     scan.gnmap     scan.xml
+        └── (phase1_discovery/ + phase2_detailed/ for two-phase runs)
 ```
 
----
-
-## 🛠️ Adding a Custom Profile
-
-Adding a new scan type requires **one dictionary entry** and zero other code changes.
-The interactive menu range updates automatically:
-
-```python
-PROFILES[12] = {
-    "label": "Stealth Scan (slow + decoys)",
-    "description": "Very slow SYN scan with decoy source addresses.",
-    "flags": ["-T1", "-Pn", "-sS", "-D", "RND:5"],
-    "needs_ports": False,
-    "needs_custom_flags": False,
-    "two_phase": False,
-}
-```
+The CLI keeps writing to `./nmap_results/` as before.
 
 ---
 
@@ -121,43 +119,40 @@ PROFILES[12] = {
 
 ```
 NmapAutomator/
-├── nmap_automator.py   # Main script
-├── README.md           # This file
-├── LICENSE             # MIT License
-├── .gitignore          # Ignore scan results and Python artifacts
-└── nmap_results/       # Created at runtime (git-ignored)
+├── nmap_automator.py        # Classic CLI (unchanged, zero-dep)
+├── nmap_gui.py              # GUI launcher
+├── requirements.txt
+├── core/
+│   ├── profiles.py          # 24 scan profiles
+│   ├── scanner.py           # ScanWorker (QThread) + nmap exec
+│   ├── parser.py            # XML + gnmap parsers → ScanResult
+│   ├── database.py          # SQLite history + custom profiles
+│   ├── reporter.py          # HTML / Markdown / JSON / CSV exporters
+│   ├── intel.py             # service→tools + vuln-hint patterns
+│   └── diff.py              # scan-vs-scan diff
+└── gui/
+    ├── main_window.py       # Sidebar + page stack
+    ├── theme.py             # Dark red-team QSS
+    ├── widgets.py           # KPI card, badges, profile card, nav button
+    ├── page_dashboard.py
+    ├── page_scanner.py
+    ├── page_results.py
+    ├── page_history.py
+    ├── page_tools.py
+    └── page_settings.py
 ```
 
 ---
 
 ## ⚠️ Disclaimer
 
-This tool is intended for **authorized security testing and educational purposes only**. Always obtain **explicit written permission** before scanning any network or system you do not own. Unauthorized scanning is illegal and unethical.
-
-The authors are not responsible for any misuse or damage caused by this tool.
+For **authorized security testing and education only**. Always obtain
+**explicit written permission** before scanning a network or system you
+do not own. Unauthorized scanning is illegal in most jurisdictions. The
+authors are not responsible for any misuse.
 
 ---
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Feel free to:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/new-scan-profile`)
-3. Commit your changes (`git commit -m 'Add new scan profile'`)
-4. Push to the branch (`git push origin feature/new-scan-profile`)
-5. Open a Pull Request
-
----
-
-## 🙏 Acknowledgments
-
-- [Nmap](https://nmap.org/) — the network scanner that makes this all possible
-- [OSCP](https://www.offsec.com/courses/pen-200/) methodology for the two-phase scan pattern
-- The HTB and OSCP community for sharing their enumeration workflows
+[MIT](LICENSE)
